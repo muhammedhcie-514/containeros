@@ -1,0 +1,59 @@
+Step 1 View the version that is not upgraded.
+Run the following commands on the k8smaster1 node:
+[root@k8smaster1 scripts]# kubectl get nodes -o customcolumns='NAME:.metadata.name,OS:.status.nodeInfo.osImage'
+The OS of the node to be upgraded is KubeOS v1, and the OS of the node not to be
+upgraded is openEuler 22.03 LTS.
+Step 2 Generate the SHA-256 value used for upgrade.
+Generate the SHA-256 value, which is used in the checksum field in the YAML file in step
+4.
+[root@k8smaster1 ~]# cd /root/KubeOS/scripts/
+[root@k8smaster1 scripts]# sha256sum update.img
+Step 3 Copy update.img.
+Copy update.img to the nginx directory for automatic download during the upgrade of
+k8snode4.
+[root@k8smaster1 scripts]# cp -r update.img /usr/share/nginx/repo
+Step 4 Declare resources.
+[root@k8smaster1 scripts]# kubectl apply -
+f ../docs/example/config/crd/upgrade.openeuler.org_os.yaml
+Step 5 Create a YAML file.
+Create a YAML file used for upgrade. Change the value of the checksum field to the
+value generated in step 2.
+[root@k8smaster1 scripts]# cat > upgrade_v1alpha1_os.yaml<<EOF
+apiVersion: upgrade.openeuler.org/v1alpha1
+kind: OS
+metadata:
+ name: os-sample
+spec:
+ imagetype: disk
+ opstype: upgrade
+ osversion: KubeOS v2
+ maxunavailable: 4
+ containerimage: ""
+ evictpodforce: true
+ imageurl: http://192.168.1.11:80/update.img
+ checksum: 7986f65ce2xxxxxxxd8131600462e
+ flagSafe: true
+ mtls: false
+EOF
+
+
+
+Step 6 Run the upgrade command.
+[root@k8smaster1 scripts]# kubectl apply -f upgrade_v1alpha1_os.yaml
+Step 7 Check the upgrade process on the k8snode4 node.
+[root@k8snode4 ~]# journalctl -f -u os-agent
+Step 8 Check the upgrade result.
+Run the following command to verify that k8snode4 has been upgraded to KubeOS v2:
+[root@k8smaster1 scripts]# kubectl get nodes -o customcolumns='NAME:.metadata.name,OS:.status.nodeInfo.osImage'
+
+Step 9 Clear the environment.
+The k8snode4 node is used only in this lab. After this lab is complete, delete it from the
+cluster.
+[root@k8smaster1 scripts]# rm -rf system.img
+[root@k8smaster1 scripts]# rm -rf system.qcow2
+[root@k8smaster1 scripts]# rm -rf update.img
+[root@k8smaster1 scripts]# kubectl delete -f ../docs/example/config/crd
+[root@k8smaster1 scripts]# kubectl delete -f ../docs/example/config/rbac
+[root@k8smaster1 scripts]# kubectl delete -f ../docs/example/config/manager
+[root@k8smaster1 scripts]# kubectl delete nodes k8snode4
+
