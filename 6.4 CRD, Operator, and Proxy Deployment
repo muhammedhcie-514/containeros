@@ -1,0 +1,68 @@
+Step 1 Create a Dockerfile.
+[root@k8smaster1 deploy]# cd /root/KubeOS
+[root@k8smaster1 KubeOS]# cat > Dockerfile1<<EOF
+FROM swr.cn-east-3.myhuaweicloud.com/hcie_openeuler/openeuler-22.03-lts-sp3
+COPY ./bin/proxy /proxy
+ENTRYPOINT ["/proxy"]
+EOF
+cat > Dockerfile2<<EOF
+FROM swr.cn-east-3.myhuaweicloud.com/hcie_openeuler/openeuler-22.03-lts-sp3
+COPY --chown=6552:6552 ./bin/operator /operator
+ENTRYPOINT ["/operator"]
+EOF
+Step 2 Build container images.
+[root@k8smaster1 KubeOS]# docker build -f Dockerfile1 -t os-proxy:1.0.1 .
+[root@k8smaster1 KubeOS]# docker build -f Dockerfile2 -t os-operator:1.0.1 .
+Step 3 Replicate the images.
+Save the images.
+[root@k8smaster1 example]# docker save -o os-proxy.tar os-proxy
+[root@k8smaster1 example]# docker save -o os-operator.tar os-operator
+Transfer the os-proxy.tar image to the k8snode4 node to be upgraded.
+[root@k8smaster1 example]# scp os-proxy.tar k8snode4:/var/
+Transfer the os-operator.tar image to other master nodes.
+[root@k8smaster1 example]# scp os-operator.tar k8smaster2:/var/
+[root@k8smaster1 example]# scp os-operator.tar k8smaster3:/var/
+Load the image on the k8snode4 node.
+[root@k8snode4 ~]# cd /var
+[root@k8snode4 ~]# docker load -i os-proxy.tar
+Load the image on k8smaster2 and k8smaster3. The following gives an example of
+loading the image on k8smaster2:
+[root@k8smaster2 ~]# cd /var
+[root@k8smaster2 ~]# docker load -i os-operator.tar
+Note: In this lab, the built container image is directly copied to each node for loading.
+You can also upload the built image to a private container image repository or Huawei
+Cloud SoftWare Repository for Container (SWR). In this case, skip this step.
+
+
+Step 4 Change image repositories.
+Run the following command on the k8smaster1 node:
+[root@k8smaster1 KubeOS]# cd /root/KubeOS/docs/example/
+Open the config/manager/manager.yaml file and change the image repositories of
+operator and proxy.
+...
+ spec:
+ containers:
+ - name: proxy
+ command:
+ - /proxy
+ image: os-proxy:1.0.1
+...
+ spec:
+ containers:
+ - command:
+ - /operator
+ image: os-operator:1.0.1
+Step 5 Deploy the images.
+Run the following commands on the k8smaster1 node:
+[root@k8smaster1 example]# kubectl apply -f config/crd
+[root@k8smaster1 example]# kubectl apply -f config/rbac
+[root@k8smaster1 example]# kubectl apply -f config/manager
+Step 6 View results.
+[root@k8smaster1 example]# kubectl get pods -A -o wide | grep upgrade-system
+operator runs on a master node, and proxy runs on k8smaster1 and k8snode4. If the
+images of operator and proxy failed to load on a node, you can ignore the load failure if
+the node does not need to be upgraded.
+
+
+
+
