@@ -1,0 +1,52 @@
+Step 1 Deploy a k8snode4 node.
+Install a new node for the upgrade lab (if server resources are limited, you can use an
+existing node in the original Kubernetes cluster). Select the base container OS image
+oe2203lts.qcow2 created in step 5 in section 6.2, set the private IP address to
+192.168.1.17. After the OS is started, perform the following steps to add the node to the
+Kubernetes cluster:
+1. Change hostname to k8snode4.
+[root@host-192-168-1-17 ~]# hostnamectl hostname k8snode4
+Exit SSH and log in to k8snode4 again.
+2. Configure host name resolution on k8smaster1 and k8snode4.
+cat <<EOF>>/etc/hosts
+192.168.1.11 k8smaster1
+192.168.1.12 k8smaster2
+192.168.1.13 k8smaster3
+192.168.1.14 k8snode1
+192.168.1.15 k8snode2
+192.168.1.16 k8snode3
+192.168.1.17 k8snode4
+EOF
+3. Modify the cgroup configuration of Docker and restart Docker.
+[root@k8snode4 ~]# cat <<EOF > /etc/docker/daemon.json
+{
+ "exec-opts": ["native.cgroupdriver=systemd"]
+}
+EOF
+[root@k8snode4 ~]# systemctl daemon-reload
+[root@k8snode4 ~]# systemctl restart docker
+[root@k8snode4 ~]# systemctl status docker
+4. Run the kubeadm token create --print-join-command command on k8smaster1 to
+generate the kubeadm join command for adding the node to the cluster, and run the
+command on k8snode4.
+
+
+Step 2 Modify the network configuration file.
+Change the cni path on the node because only the /etc and /var directories are writable
+for the images created by KubeOS. You can run the docker images command to view the
+pause image name. Example:
+[root@k8snode4 ~]# cat > /var/lib/kubelet/kubeadm-flags.env <<EOF
+KUBELET_KUBEADM_ARGS="--network-plugin=cni --pod-infra-container-image=swr.cn-east3.myhuaweicloud.com/hcie_openeuler/pause:3.6 --cni-bin-dir=/etc/cni/bin"
+EOF
+[root@k8snode4 ~]# systemctl daemon-reload && systemctl restart kubelet
+Step 3 Modify the YAML file of Calico.
+Modify the Calico configuration file on the k8smaster1 node.
+[root@k8smaster1 ~]# cd /root/deploy
+[root@k8smaster1 deploy]# vim calico.yaml
+Change cni-bin-dir to /etc/cni/bin.
+Re-deploy Calico.
+[root@k8smaster1 deploy]# kubectl apply -f calico.yaml
+Wait until all pods of Calico are in the Running state and verify that the k8snode4 node
+is in the Ready state.
+[root@k8smaster1 deploy]# kubectl get nodes
+
