@@ -1,0 +1,62 @@
+Step 1 View the kernel version.
+Select a node in the Kubernetes cluster to perform kernel live upgrade. For example,
+select k8smaster3, log in to k8smaster3, and run the following command to view the
+kernel version:
+[root@k8smaster3 ~]# uname -r
+5.10.0-60.116.0.143.oe2203.x86_64
+[root@k8smaster3 ~]#
+Step 2 Download the ISO file.
+Download the ISO image of the OS.
+[root@k8smaster3 ~]# curl -O https://mirror.sjtu.edu.cn/openeuler/openEuler-22.03-
+LTS/ISO/x86_64/openEuler-22.03-LTS-x86_64-dvd.iso
+Step 3 Mount the ISO file of openEuler.
+[root@k8smaster3 ~]# mount openEuler-22.03-LTS-x86_64-dvd.iso /mnt
+Step 4 Configure a local Yum repository.
+[root@k8smaster3 ~]# cat > /etc/yum.repos.d/local.repo<<EOF
+[local]
+name=local
+baseurl=file:///mnt
+gpgcheck=1
+enabled=1
+EOF
+Step 5 Import the GPG public key for RPM digital signatures.
+[root@k8smaster3 ~]# rpm --import /mnt/RPM-GPG-KEY-openEuler
+Step 6 Install nvwa.
+[root@k8smaster3 ~]# yum install nvwa -y
+Verify that the installation is successful.
+[root@k8smaster3 ~]# rpm -qa | grep nvwa
+
+
+Enable nvwa and check its running status.
+[root@k8smaster3 ~]# systemctl enable nvwa
+[root@k8smaster3 ~]# systemctl start nvwa
+[root@k8smaster3 ~]# service nvwa status
+
+Step 7 Install the kernel of a later version.
+Run the following commands to download and install the kernel of a later version:
+[root@k8smaster3 ~]# curl -O https://repo.huaweicloud.com/openeuler/openEuler-22.03-
+LTS/update/x86_64/Packages/kernel-5.10.0-60.117.0.144.oe2203.x86_64.rpm
+[root@k8smaster3 ~]# rpm -ivh kernel-5.10.0-60.117.0.144.oe2203.x86_64.rpm
+Check the kernel installation result.
+[root@k8smaster3 ~]# ls /boot
+
+
+Step 8 Upgrade the kernel.
+Run the following command to perform a kernel live upgrade. The SSH window is
+automatically disconnected, but the OS does not restart. Log in to the OS again.
+[root@k8smaster3 ~]# nvwa update 5.10.0-60.117.0.144.oe2203.x86_64
+
+
+Step 9 View the kernel version.
+[root@k8smaster3 ~]# uname -r
+Step 10 (Optional) Clear upgrade information.
+[root@k8smaster3 ~]# nvwa init
+Step 11 Roll back the kernel version.
+Run the nvwa update command again and select the kernel version before the upgrade
+to roll back the kernel to this version.
+[root@k8smaster3 ~]# nvwa update 5.10.0-60.116.0.143.oe2203.x86_64
+
+
+
+
+
